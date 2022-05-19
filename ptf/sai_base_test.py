@@ -519,8 +519,8 @@ class SaiHelperBase(ThriftInterfaceDataPlane):
         # add new ports from port config file
         self.ports_config = self.parsePortConfig(
             self.test_params['port_config_ini'])
-        for name, port in self.ports_config.items():
-            print("Creating port: %s" % name)
+        for index, port in self.ports_config.items():
+            print("Creating port: %s" % self.ports_config[index])
             fec_mode = fec_str_to_int(port.get('fec', None))
             auto_neg_mode = True if port.get(
                 'autoneg', "").lower() == "on" else False
@@ -564,6 +564,7 @@ class SaiHelperBase(ThriftInterfaceDataPlane):
         """
         ports = OrderedDict()
         try:
+            index = 0
             with open(port_config_file) as conf:
                 for line in conf:
                     if line.startswith('#'):
@@ -573,6 +574,7 @@ class SaiHelperBase(ThriftInterfaceDataPlane):
                     tokens = line.split()
                     if len(tokens) < 2:
                         continue
+                    
                     name_index = titles.index('name')
                     name = tokens[name_index]
                     data = {}
@@ -583,7 +585,9 @@ class SaiHelperBase(ThriftInterfaceDataPlane):
                     data['lanes'] = [int(lane)
                                      for lane in data['lanes'].split(',')]
                     data['speed'] = int(data['speed'])
-                    ports[name] = data
+                    data['name'] = name
+                    ports[index] = data
+                    index = index + 1
             return ports
         except Exception as e:
             raise e
