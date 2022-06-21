@@ -356,7 +356,7 @@ class PortConfiger(object):
         print("Set port...")
         for i, port in enumerate(port_list):
             sai_thrift_set_port_attribute(
-                self.client, port_oid=port, mtu=PORT_MTU, admin_state=True, fec_mode=SAI_PORT_FEC_MODE_RS)
+                self.client, port_oid=port, mtu=PORT_MTU, admin_state=True)
 
     def turn_up_and_check_ports(self, port_list):
         '''
@@ -382,8 +382,7 @@ class PortConfiger(object):
                         self.client, 
                         port_oid=port_id, 
                         mtu=PORT_MTU, 
-                        admin_state=True, 
-                        fec_mode=SAI_PORT_FEC_MODE_RS)
+                        admin_state=True)
             if all_ports_are_up:
                 print("Retry {} times turn up port.".format(num_of_tries))
                 break
