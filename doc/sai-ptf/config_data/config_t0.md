@@ -6,7 +6,6 @@
 - [1. L2 Configurations](#1-l2-configurations)
   - [1.1 FDB Configuration](#11-fdb-configuration)
   - [1.2 VLAN configuration](#12-vlan-configuration)
-    - [1.3 Host Interface](#13-host-interface)
 - [2. L3 configuration](#2-l3-configuration)
   - [2.1 VLAN Interfaces](#21-vlan-interfaces)
   - [2.2 LAG configuration](#22-lag-configuration)
@@ -84,12 +83,6 @@ The MAC Table for VLAN L2 forwarding as below
 |-|-|-|-|
 |Ethernet4-32|10|Port1-8|Untag|
 |Ethernet36-72|20|Port9-16|Untag|
-
-### 1.3 Host Interface
-
-|HostIf_Trap_Group|Queue|Policer|
-|-|-|-|
-|DEFAULT|0||
 
 
 # 2. L3 configuration
