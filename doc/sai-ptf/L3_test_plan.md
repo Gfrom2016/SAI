@@ -41,6 +41,11 @@
     - [Case13: test_next_hop_group_and_ecmp_entry_api](#case13-test_next_hop_group_and_ecmp_entry_api)
   - [Test Group4: Route interface](#test-group4-route-interface)
     - [Case1: test_ingress_disable](#case1-test_ingress_disable)
+    - [Case2: test_ingress_mac_update](#case2-test_ingress_mac_update)
+    - [Case3: test_ingress_mtu](#case3-test_ingress_mtu)
+    - [Case4: test_ingress_disable_v6](#case4-test_ingress_disable_v6)
+    - [Case5: test_ingress_mac_update_v6](#case5-test_ingress_mac_update_v6)
+    - [Case6: test_ingress_mtu_v6](#case6-test_ingress_mtu_v6)
 # Test Configuration
 
 For the test configuration, please refer to the file 
@@ -259,6 +264,11 @@ Verify the basic Next Hop group functions:
 
 ## Test Group4: Route interface
 ### Case1: test_ingress_disable
+### Case2: test_ingress_mac_update
+### Case3: test_ingress_mtu
+### Case4: test_ingress_disable_v6
+### Case5: test_ingress_mac_update_v6
+### Case6: test_ingress_mtu_v6
 
 
 ### Test steps <!-- omit in toc --> 
