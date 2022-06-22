@@ -71,6 +71,9 @@ def t0_port_config_helper(test_obj, is_recreate_bridge=True, is_create_hostIf=Tr
         test_obj.host_intf_table_id = host_intf_table_id
         test_obj.hostif_list = hostif_list
 
+
+    test_obj.cpu_port_hdl, test_obj.cpu_queue_list = configer.check_cpu_port_hdl()
+
     test_obj.dev_port_list = dev_port_list
     test_obj.portConfigs = portConfigs
     test_obj.default_trap_group = default_trap_group
@@ -94,6 +97,40 @@ class PortConfiger(object):
         """
         self.test_obj = test_obj
         self.client = test_obj.client
+
+    def check_cpu_port_hdl(self):
+        """
+        Get CPU port and Checks cpu port handler.
+        Expect the cpu_port_hdl equals to qos_queue port id, number_of_queues in qos equals to queue index.
+
+        Args:
+
+        """
+
+        attr = sai_thrift_get_switch_attribute(self.client, cpu_port=True)
+        cpu_port_hdl = attr['cpu_port']
+        self.test_obj.assertNotEqual(cpu_port_hdl, 0)
+
+        cpu_queue_list = []
+        attr = sai_thrift_get_port_attribute(self.client,
+                                             cpu_port_hdl,
+                                             qos_number_of_queues=True)
+        num_queues = attr['qos_number_of_queues']
+        q_list = sai_thrift_object_list_t(count=num_queues)
+        attr = sai_thrift_get_port_attribute(self.client,
+                                             cpu_port_hdl,
+                                             qos_queue_list=q_list)
+        for queue in range(0, num_queues):
+            queue_id = attr['qos_queue_list'].idlist[queue]
+            cpu_queue_list.append(queue_id)
+            q_attr = sai_thrift_get_queue_attribute(
+                self.client,
+                queue_id,
+                port=True,
+                index=True,
+                parent_scheduler_node=True)
+            self.test_obj.assertEqual(queue, q_attr['index'])
+        return cpu_port_hdl, cpu_queue_list
 
     def create_bridge_ports(self, bridge_id, port_list):
         """

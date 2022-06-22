@@ -24,6 +24,7 @@ from ptf import config
 from ptf.testutils import *
 from ptf.thriftutils import *
 from sai_utils import *
+import pdb
 
 class Vlan_Domain_Forwarding_Test(T0TestBase):
     """
@@ -170,13 +171,21 @@ class L3LagTest(T0TestBase):
         route1 = sai_thrift_route_entry_t(vr_id=vr_id, destination=sai_ipprefix(ip_addr1+'/24'))
         sai_thrift_create_route_entry(self.client, route1, next_hop_id=nhop1)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+        
 
         pkt1 = simple_tcp_packet(eth_dst=router_mac,eth_src='00:22:22:22:22:22',ip_dst='10.10.10.1',ip_src='192.168.0.2',ip_id=105,ip_ttl=64)
         pkt2 = simple_tcp_packet(eth_dst=router_mac,eth_src='00:22:22:22:22:22',ip_dst='10.10.10.1',ip_src='192.168.0.1',ip_id=105,ip_ttl=64)
         exp_pkt = simple_tcp_packet(eth_dst="00:44:33:22:11:00",eth_src=router_mac,ip_dst='10.10.10.1',ip_src='192.168.0.1',ip_id=105,ip_ttl=63)
+        exp_pkt2 = simple_tcp_packet(eth_dst="00:44:33:22:11:00",eth_src=router_mac,ip_dst='10.10.10.1',ip_src='192.168.0.2',ip_id=105,ip_ttl=63)
+        post_stats = sai_thrift_get_queue_stats(self.client, self.cpu_queue_list[0])
         # tcpdump -i eth17 -nv tcp
+        pdb.set_trace()
         send_packet(self, 21, pkt1)
         verify_packet_any_port(self, exp_pkt, [17,18])
         send_packet(self, 21, pkt2)
-        verify_packet_any_port(self, exp_pkt, [17,18])
+        verify_packet_any_port(self, exp_pkt2, [17,18])
+
+        #not support in broadcom
+        #sai_thrift_remove_neighbor_entry(self.client, nbr_entry_v4)
+        #sai_thrift_remove_next_hop(self.client, nhop1)
         
