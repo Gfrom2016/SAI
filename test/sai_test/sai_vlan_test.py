@@ -175,11 +175,11 @@ class L3LagTest(T0TestBase):
 
         pkt1 = simple_tcp_packet(eth_dst=router_mac,eth_src='00:22:22:22:22:22',ip_dst='10.10.10.1',ip_src='192.168.0.2',ip_id=105,ip_ttl=64)
         pkt2 = simple_tcp_packet(eth_dst=router_mac,eth_src='00:22:22:22:22:22',ip_dst='10.10.10.1',ip_src='192.168.0.1',ip_id=105,ip_ttl=64)
-        exp_pkt = simple_tcp_packet(eth_dst="00:44:33:22:11:00",eth_src=router_mac,ip_dst='10.10.10.1',ip_src='192.168.0.1',ip_id=105,ip_ttl=63)
-        exp_pkt2 = simple_tcp_packet(eth_dst="00:44:33:22:11:00",eth_src=router_mac,ip_dst='10.10.10.1',ip_src='192.168.0.2',ip_id=105,ip_ttl=63)
+        exp_pkt = simple_tcp_packet(eth_dst="00:44:33:22:11:00",eth_src=router_mac,ip_dst='10.10.10.1',ip_src='192.168.0.2',ip_id=105,ip_ttl=63)
+        exp_pkt2 = simple_tcp_packet(eth_dst="00:44:33:22:11:00",eth_src=router_mac,ip_dst='10.10.10.1',ip_src='192.168.0.1',ip_id=105,ip_ttl=63)
         post_stats = sai_thrift_get_queue_stats(self.client, self.cpu_queue_list[0])
         # tcpdump -i eth17 -nv tcp
-        pdb.set_trace()
+        #pdb.set_trace()
         send_packet(self, 21, pkt1)
         verify_packet_any_port(self, exp_pkt, [17,18])
         send_packet(self, 21, pkt2)
