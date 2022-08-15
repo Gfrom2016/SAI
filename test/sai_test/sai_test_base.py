@@ -325,7 +325,7 @@ class T0TestBase(ThriftInterfaceDataPlane):
 
         self.t1_groups = [1, 2]
         """
-        Group numbers for server
+        Group numbers for t1
         """
 
         self.num_device_each_group = 101
