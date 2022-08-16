@@ -118,6 +118,49 @@ def t0_route_config_helper(
         #set expected dest T1
         test_obj.t1_list[2][100].l3_lag_obj = test_obj.dut.lag_list[1]
 
+    if is_create_route_for_vlan:
+        test_obj.vlan10_neighbor_device = Device(device_type=DeviceType.server, id=255, group_id=1)
+        test_obj.vlan10_neighbor_device.mac = BROADCAST_MAC
+        test_obj.vlan10_neighbor_device.ipv6 = None
+        route_configer.create_neighbor_by_vlan(
+            nexthop_device=test_obj.vlan10_neighbor_device,
+            vlan=test_obj.dut.vlans[10],
+            no_host=False)
+        for index in range(0, 8):
+            route_configer.create_neighbor_by_vlan(
+                nexthop_device=test_obj.servers[1][index],
+                vlan=test_obj.dut.vlans[10])
+            route_configer.create_neighbor_by_vlan(
+                nexthop_device=test_obj.servers[1][90+index],
+                vlan=test_obj.dut.vlans[10])
+
+        test_obj.servers[1][0].ip_prefix = '24'
+        test_obj.servers[1][0].ip_prefix_v6 = '112'
+        router_configer.create_route_path_by_nexthop_from_vlan(
+            dest_device=test_obj.servers[1][0],
+            nexthop_device=test_obj.servers[1][0],
+            vlan=test_obj.dut.vlans[10])
+
+        test_obj.vlan20_neighbor_device = Device(device_type=DeviceType.server, id=255, group_id=2)
+        test_obj.vlan20_neighbor_device.mac = BROADCAST_MAC
+        test_obj.vlan20_neighbor_device.ipv6 = None
+        route_configer.create_neighbor_by_vlan(
+            nexthop_device=test_obj.vlan20_neighbor_device,
+            vlan=test_obj.dut.vlans[20],
+            no_host=False)
+        for index in range(0, 8):
+            route_configer.create_neighbor_by_vlan(
+                nexthop_device=test_obj.servers[2][9+index],
+                vlan=test_obj.dut.vlans[20])
+            route_configer.create_neighbor_by_vlan(
+                nexthop_device=test_obj.servers[2][91+index],
+                vlan=test_obj.dut.vlans[20])
+        test_obj.servers[2][0].ip_prefix = '24'
+        test_obj.servers[2][0].ip_prefix_v6 = '112'
+        router_configer.create_route_path_by_nexthop_from_vlan(
+            dest_device=test_obj.servers[2][0],
+            nexthop_device=test_obj.servers[2][0],
+            vlan=test_obj.dut.vlans[20])
 
 class RouteConfiger(object):
     """
