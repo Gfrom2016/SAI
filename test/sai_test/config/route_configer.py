@@ -126,7 +126,7 @@ def t0_route_config_helper(
             nexthop_device=test_obj.vlan10_neighbor_device,
             vlan=test_obj.dut.vlans[10],
             no_host=False)
-        for index in range(0, 8):
+        for index in range(1, 9):
             route_configer.create_neighbor_by_vlan(
                 nexthop_device=test_obj.servers[1][index],
                 vlan=test_obj.dut.vlans[10])
