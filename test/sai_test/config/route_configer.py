@@ -24,7 +24,7 @@ from sai_utils import *  # pylint: disable=wildcard-import; lgtm[py/polluting-im
 from constant import *  # pylint: disable=wildcard-import; lgtm[py/polluting-import]
 from typing import TYPE_CHECKING, Tuple
 
-from data_module.device import Device
+from data_module.device import Device, DeviceType
 from data_module.vlan import Vlan
 from data_module.lag import Lag
 from data_module.port import Port
@@ -136,10 +136,7 @@ def t0_route_config_helper(
 
         test_obj.servers[1][0].ip_prefix = '24'
         test_obj.servers[1][0].ip_prefix_v6 = '112'
-        router_configer.create_route_path_by_nexthop_from_vlan(
-            dest_device=test_obj.servers[1][0],
-            nexthop_device=test_obj.servers[1][0],
-            vlan=test_obj.dut.vlans[10])
+        route_configer.create_route_path_by_rif(dest_device=test_obj.servers[1][0], rif=test_obj.dut.vlans[10].rif)
 
         test_obj.vlan20_neighbor_device = Device(device_type=DeviceType.server, id=255, group_id=2)
         test_obj.vlan20_neighbor_device.mac = BROADCAST_MAC
@@ -157,10 +154,8 @@ def t0_route_config_helper(
                 vlan=test_obj.dut.vlans[20])
         test_obj.servers[2][0].ip_prefix = '24'
         test_obj.servers[2][0].ip_prefix_v6 = '112'
-        router_configer.create_route_path_by_nexthop_from_vlan(
-            dest_device=test_obj.servers[2][0],
-            nexthop_device=test_obj.servers[2][0],
-            vlan=test_obj.dut.vlans[20])
+        route_configer.create_route_path_by_rif(dest_device=test_obj.servers[2][0], rif=test_obj.dut.vlans[20].rif)
+
 
 class RouteConfiger(object):
     """
