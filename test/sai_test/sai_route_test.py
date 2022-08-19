@@ -46,6 +46,18 @@ class RouteRifTest(T0TestBase):
                                                             type=SAI_ROUTER_INTERFACE_TYPE_PORT,
                                                             port_id=self.dut.port_list[5])
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+        # remove current route for lag2
+        self.dut.routev4_list.remove(self.servers[12][0].routev4)
+        self.dut.routev6_list.remove(self.servers[12][0].routev6)
+        sai_thrift_remove_route_entry(self.client, self.servers[12][0].routev4)
+        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+        sai_thrift_remove_route_entry(self.client, self.servers[12][0].routev6)
+        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+        self.servers[12][0].ip_prefix = '24'
+        self.servers[12][0].ip_prefix_v6 = '112'
+        self.new_routev4, self.new_routev6 = self.route_configer.create_route_path_by_rif(
+            dest_device=self.servers[12][0],
+            rif=self.dut.lag2.rif)
 
         try:
             for i in range(0, 8):
@@ -62,10 +74,19 @@ class RouteRifTest(T0TestBase):
                 verify_packet_any_port(self, exp_pkt, self.dut.lag2.member_port_indexs)
                 print("received packet with dst_ip:{} on one of lag2 member".format(self.servers[12][i].ipv4))
         finally:
-            sai_thrift_remove_router_interface(self.client, self.port5_rif)
-            self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+            pass
     
     def tearDown(self):
+        self.dut.routev4_list.remove(self.new_routev4)
+        self.dut.routev6_list.remove(self.new_routev6)
+        sai_thrift_remove_route_entry(self.client, self.new_routev4)
+        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+        sai_thrift_remove_route_entry(self.client, self.new_routev6)
+        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+        self.route_configer.create_route_path_by_nexthop_from_lag(
+            dest_device=self.servers[12][0],
+            nexthop_device=self.t1_list[2][100],
+            lag=self.dut.lag2)
         super().tearDown()
 
 
@@ -99,7 +120,7 @@ class LagMultipleRouteTest(T0TestBase):
         self.servers[21][0].ip_prefix = '24'
         self.servers[21][0].ip_prefix_v6 = '112'
         self.new_route4, self.new_route6 = self.route_configer.create_route_path_by_nexthop(
-            dest_device=new_dst, 
+            dest_device=self.servers[21][0], 
             nexthopv4=self.dut.lag1.nexthopv4, 
             nexthopv6=self.dut.lag1.nexthopv6)
         
@@ -308,7 +329,7 @@ class RouteLPMRouteNexthopTest(T0TestBase):
         self.port2_nbr_entry = sai_thrift_neighbor_entry_t(rif_id=self.port2_rif,
                                                            ip_address=sai_ipaddress(self.dst_ip))
         status = sai_thrift_create_neighbor_entry(self.client,
-                                                  entry=self.port2_nbr_entry,
+                                                  self.port2_nbr_entry,
                                                   dst_mac_address=self.dmac1)
         self.assertEqual(status, SAI_STATUS_SUCCESS)
         print("Add a neighbor with IP:192.168.1.200 on Port2 with DMAC1")
@@ -337,17 +358,17 @@ class RouteLPMRouteNexthopTest(T0TestBase):
             self.port1_nbr_entry = sai_thrift_neighbor_entry_t(rif_id=self.port1_rif,
                                                                ip_address=sai_ipaddress(self.dst_ip))
             status = sai_thrift_create_neighbor_entry(self.client,
-                                                      entry=self.port1_nbr_entry,
+                                                      self.port1_nbr_entry,
                                                       dst_mac_address=self.dmac2)
             print("Add a neighbor with IP:192.168.1.200 on Port1 with DMAC2")
 
             # Add a new route for DIP:192.168.1.200/32 with a next-hop on port1
-            self.port1_nhop = sai_thrift_create_neighbor_entry(self.client,
-                                                               ip=sai_ipaddress(self.dst_ip),
-                                                               router_interface_id=self.port1_rif,
-                                                               type=SAI_NEXT_HOP_TYPE_IP)
+            self.port1_nhop = sai_thrift_create_next_hop(self.client,
+                                                         ip=sai_ipaddress(self.dst_ip),
+                                                         router_interface_id=self.port1_rif,
+                                                         type=SAI_NEXT_HOP_TYPE_IP)
             self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-            self.port1_route = sai_thrift_route_entry_t(vr_id=self.default_vrf,
+            self.port1_route = sai_thrift_route_entry_t(vr_id=self.dut.default_vrf,
                                                         destination=sai_ipprefix(self.dst_ip+'/32'))
             status = sai_thrift_create_route_entry(self.client, self.port1_route, next_hop_id=self.port1_nhop)
             self.assertEqual(status, SAI_STATUS_SUCCESS)
@@ -355,7 +376,7 @@ class RouteLPMRouteNexthopTest(T0TestBase):
 
             send_packet(self, 5, pkt)
             verify_packet(self, exp_pkt2, 1)
-            print("after add new neighbor for port1, packet with dst_ip:{} sent from port5, received from port1".format(dst_ip))
+            print("after add new neighbor for port1, packet with dst_ip:{} sent from port5, received from port1".format(self.dst_ip))
         finally:
             pass
 
@@ -365,8 +386,6 @@ class RouteLPMRouteNexthopTest(T0TestBase):
         sai_thrift_remove_next_hop(self.client, self.port1_nhop)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         sai_thrift_remove_neighbor_entry(self.client, self.port1_nbr_entry)
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_neighbor_entry(self.client, self.port2_nbr_entry)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         sai_thrift_remove_router_interface(self.client, self.port2_rif)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
@@ -421,7 +440,7 @@ class RouteLPMRouteRifTest(T0TestBase):
         self.port2_nbr_entry = sai_thrift_neighbor_entry_t(rif_id=self.port2_rif,
                                                            ip_address=sai_ipaddress(self.dst_ip))
         status = sai_thrift_create_neighbor_entry(self.client,
-                                                  entry=self.port2_nbr_entry,
+                                                  self.port2_nbr_entry,
                                                   dst_mac_address=self.dmac1)
         self.assertEqual(status, SAI_STATUS_SUCCESS)
         print("Add a neighbor with IP:192.168.1.200 on Port2 with DMAC1")
@@ -450,12 +469,12 @@ class RouteLPMRouteRifTest(T0TestBase):
             self.port1_nbr_entry = sai_thrift_neighbor_entry_t(rif_id=self.port1_rif,
                                                                ip_address=sai_ipaddress(self.dst_ip))
             status = sai_thrift_create_neighbor_entry(self.client,
-                                                      entry=self.port1_nbr_entry,
+                                                      self.port1_nbr_entry,
                                                       dst_mac_address=self.dmac2)
             print("Add a neighbor with IP:192.168.1.200 on Port1 with DMAC2")
 
             # Add a new route for DIP: IP:192.168.1.200/32 and bind to port1 rif directly
-            self.port1_route = sai_thrift_route_entry_t(vr_id=self.default_vrf,
+            self.port1_route = sai_thrift_route_entry_t(vr_id=self.dut.default_vrf,
                                                         destination=sai_ipprefix(self.dst_ip+'/32'))
             status = sai_thrift_create_route_entry(self.client, self.port1_route, next_hop_id=self.port1_rif)
             self.assertEqual(status, SAI_STATUS_SUCCESS)
@@ -463,7 +482,7 @@ class RouteLPMRouteRifTest(T0TestBase):
 
             send_packet(self, 5, pkt)
             verify_packet(self, exp_pkt2, 1)
-            print("after add new neighbor for port1, packet with dst_ip:{} sent from port5, received from port1".format(dst_ip))
+            print("after add new neighbor for port1, packet with dst_ip:{} sent from port5, received from port1".format(self.dst_ip))
         finally:
             pass
 
@@ -471,8 +490,6 @@ class RouteLPMRouteRifTest(T0TestBase):
         sai_thrift_remove_route_entry(self.client, self.port1_route)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         sai_thrift_remove_neighbor_entry(self.client, self.port1_nbr_entry)
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_neighbor_entry(self.client, self.port2_nbr_entry)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         sai_thrift_remove_router_interface(self.client, self.port2_rif)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
