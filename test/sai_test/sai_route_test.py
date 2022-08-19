@@ -368,11 +368,11 @@ class RouteLPMRouteNexthopTest(T0TestBase):
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         sai_thrift_remove_neighbor_entry(self.client, self.port2_nbr_entry)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_router_interface(self.client, self.port2_rif_id)
+        sai_thrift_remove_router_interface(self.client, self.port2_rif)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_router_interface(self.client, self.port5_rif_id)
+        sai_thrift_remove_router_interface(self.client, self.port5_rif)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_router_interface(self.client, self.port1_rif_id)
+        sai_thrift_remove_router_interface(self.client, self.port1_rif)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         super().tearDown()
 
@@ -474,10 +474,62 @@ class RouteLPMRouteRifTest(T0TestBase):
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         sai_thrift_remove_neighbor_entry(self.client, self.port2_nbr_entry)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_router_interface(self.client, self.port2_rif_id)
+        sai_thrift_remove_router_interface(self.client, self.port2_rif)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_router_interface(self.client, self.port5_rif_id)
+        sai_thrift_remove_router_interface(self.client, self.port5_rif)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_router_interface(self.client, self.port1_rif_id)
+        sai_thrift_remove_router_interface(self.client, self.port1_rif)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         super().tearDown()
+
+
+class SviMacFloodingTest(T0TestBase):
+    """
+    Verify route to svi and flooding
+    """
+
+    def setUp(self):
+        """
+        Test the basic setup process.
+        """
+        super().setUp()
+
+    def runTest(self):
+        """
+        1. Check config for mac for port1~8 already exist
+        2. Check already created route and neighbor as, route subnet 192.168.1.0/24 next hop to VLAN10 SVI, neighbor for Port2-4 with IP DIP:192.168.1.92-94 bind to VLAN10 SVI
+        3. Create neighbor for DIP:192.168.1.94 with new DMAC:Mac4 on port4 route interface
+        4. Send packet with DMAC: SWITCH_MAC, SMAC:00:01:01:99:01:92 and DIP: IP:192.168.1.94 on port10
+        5. No packet or flooding on VLAN10 member port
+        """
+
+        # create neighbor for DIP:192.168.1.94 with new DMAC:Mac4 on port4 route interface
+        dmac4 = '00:11:22:33:44:55'
+        self.port4_nbr_device = Device(device_type=DeviceType.server, id=94, group_id=1)
+        self.port4_nbr_device.mac = dmac4
+        self.port4_rif = sai_thrift_create_router_interface(self.client,
+                                                            virtual_router_id=self.dut.default_vrf,
+                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
+                                                            port_id=self.dut.port_list[4])
+        self.port4_nbr_v4, self.port4_nbr_v6 = self.route_configer.create_neighbor_by_rif(nexthop_device=self.port4_nbr_device, rif=self.port4_rif)
+        # new nbr_entry appended to list, need to remove when teardown
+        print("Create neighbor for DIP:192.168.1.94 with new DMAC:Mac4 on port4 route interface")
+        
+        pkt = simple_tcp_packet(eth_dst=ROUTER_MAC,
+                                eth_src=self.servers[1][92].mac,
+                                ip_dst=self.servers[1][94].ipv4)
+        try:
+            # didn't create router interface for port10 because we have router interface for vlan20
+            send_packet(self, 10, pkt)
+            verify_no_other_packets(self)
+            print("No packet on vlan10 member")
+        finally:
+            pass
+    
+    def tearDown(self):
+        self.dut.neighborv4_list.remove(self.port4_nbr_v4)
+        self.dut.neighborv6_list.remove(self.port4_nbr_v6)
+        sai_thrift_remove_router_interface(self.client, self.port4_rif)
+        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+        super().tearDown()
+
