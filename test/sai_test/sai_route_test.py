@@ -41,24 +41,8 @@ class RouteRifTest(T0TestBase):
         3. Verify packet received with SMAC: SWITCH_MAC SIP: 192.168.0.1 DIP:192.168.12.1~8 on one of LAG2 member
         """
         print("RouteRifTest")
-        self.port5_rif = sai_thrift_create_router_interface(self.client,
-                                                            virtual_router_id=self.dut.default_vrf,
-                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
-                                                            port_id=self.dut.port_list[5])
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        # remove current route for lag2
-        self.dut.routev4_list.remove(self.servers[12][0].routev4)
-        self.dut.routev6_list.remove(self.servers[12][0].routev6)
-        sai_thrift_remove_route_entry(self.client, self.servers[12][0].routev4)
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_route_entry(self.client, self.servers[12][0].routev6)
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        self.servers[12][0].ip_prefix = '24'
-        self.servers[12][0].ip_prefix_v6 = '112'
-        self.new_routev4, self.new_routev6 = self.route_configer.create_route_path_by_rif(
-            dest_device=self.servers[12][0],
-            rif=self.dut.lag2.rif)
 
+        self.recv_dev_port_idxs = self.get_dev_port_indexes(self.servers[12][1].l3_lag_obj.member_port_indexs)
         try:
             for i in range(0, 8):
                 pkt = simple_tcp_packet(eth_dst=ROUTER_MAC,
@@ -66,27 +50,17 @@ class RouteRifTest(T0TestBase):
                                         ip_id=105,
                                         ip_ttl=64)
                 exp_pkt = simple_tcp_packet(eth_src=ROUTER_MAC,
-                                            eth_dst=self.t1_list[2][100].mac,
+                                            eth_dst=self.servers[12][i].l3_lag_obj.neighbor_mac,
                                             ip_dst=self.servers[12][i].ipv4,
                                             ip_id=105,
                                             ip_ttl=63)
-                send_packet(self, 5, pkt)
-                verify_packet_any_port(self, exp_pkt, self.dut.lag2.member_port_indexs)
+                send_packet(self, self.dut.port_obj_list[5].dev_port_index, pkt)
+                verify_packet_any_port(self, exp_pkt, self.recv_dev_port_idxs)
                 print("received packet with dst_ip:{} on one of lag2 member".format(self.servers[12][i].ipv4))
         finally:
             pass
     
     def tearDown(self):
-        self.dut.routev4_list.remove(self.new_routev4)
-        self.dut.routev6_list.remove(self.new_routev6)
-        sai_thrift_remove_route_entry(self.client, self.new_routev4)
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_route_entry(self.client, self.new_routev6)
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        self.route_configer.create_route_path_by_nexthop_from_lag(
-            dest_device=self.servers[12][0],
-            nexthop_device=self.t1_list[2][100],
-            lag=self.dut.lag2)
         super().tearDown()
 
 
@@ -104,26 +78,15 @@ class LagMultipleRouteTest(T0TestBase):
     def runTest(self):
         """
         1. Make sure common config created for IP within in 192.168.21.0/24, through next-hop: IP 10.1.1.100 LAG1
-        2. Send packet with SIP:192.168.0.1 DIP:192.168.21.1 DMAC:SWITCH_MAC on port5
-        3. Verify packet received with SMAC: SWITCH_MAC SIP 192.168.0.1 DIP:192.168.21.1 on one of LAG1 member
-        4. Send packet with SIP:192.168.0.1 DIP:192.168.11.1 DMAC:SWITCH_MAC on port5
-        5. Verify packet received with SMAC: SWITCH_MAC SIP:192.168.0.1 DIP:192.168.11.1 on one of LAG1 member
+        2. Check vlan interfaces(svi added)
+        3. Send packet with SIP:192.168.0.1 DIP:192.168.21.1 DMAC:SWITCH_MAC on port5
+        4. Verify packet received with SMAC: SWITCH_MAC SIP 192.168.0.1 DIP:192.168.21.1 on one of LAG1 member
+        5. Send packet with SIP:192.168.0.1 DIP:192.168.11.1 DMAC:SWITCH_MAC on port5
+        6. Verify packet received with SMAC: SWITCH_MAC SIP:192.168.0.1 DIP:192.168.11.1 on one of LAG1 member
         """
         print("LagMultipleRouteTest")
-        self.port5_rif = sai_thrift_create_router_interface(self.client,
-                                                            virtual_router_id=self.dut.default_vrf,
-                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
-                                                            port_id=self.dut.port_list[5])
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        
-        self.servers[21] = [Device(DeviceType.server, index, 21) for index in range(0, self.num_device_each_group)]
-        self.servers[21][0].ip_prefix = '24'
-        self.servers[21][0].ip_prefix_v6 = '112'
-        self.new_route4, self.new_route6 = self.route_configer.create_route_path_by_nexthop(
-            dest_device=self.servers[21][0], 
-            nexthopv4=self.dut.lag1.nexthopv4, 
-            nexthopv6=self.dut.lag1.nexthopv6)
-        
+
+        self.recv_dev_port_idxs = self.get_dev_port_indexes(self.servers[11][1].l3_lag_obj.member_port_indexs)
         pkt1 = simple_tcp_packet(eth_dst=ROUTER_MAC,
                                  ip_dst=self.servers[21][1].ipv4,
                                  ip_id=105,
@@ -139,29 +102,21 @@ class LagMultipleRouteTest(T0TestBase):
                                  ip_id=105,
                                  ip_ttl=64)
         exp_pkt2 = simple_tcp_packet(eth_src=ROUTER_MAC,
-                                     eth_dst=self.t1_list[1][100].mac,
+                                     eth_dst=self.servers[11][1].l3_lag_obj.neighbor_mac,
                                      ip_dst=self.servers[11][1].ipv4,
                                      ip_id=105,
                                      ip_ttl=63)          
 
         try:
-            send_packet(self, 5, pkt1)
-            verify_packet_any_port(self, exp_pkt1, self.dut.lag1.member_port_indexs)
+            send_packet(self, self.dut.port_obj_list[5].dev_port_index, pkt1)
+            verify_packet_any_port(self, exp_pkt1, self.recv_dev_port_idxs)
             print("receive packet with dst_ip:{} from one of lag1 member".format(self.servers[21][1].ipv4))
 
-            send_packet(self, 5, pkt2)
-            verify_packet_any_port(self, exp_pkt2, self.dut.lag1.member_port_indexs)
+            send_packet(self, self.dut.port_obj_list[5].dev_port_index, pkt2)
+            verify_packet_any_port(self, exp_pkt2, self.recv_dev_port_idxs)
             print("receive packet with dst_ip:{} from one of lag1 member".format(self.servers[11][1].ipv4))
         finally:
-            sai_thrift_remove_router_interface(self.client, self.port5_rif)
-            self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-            self.dut.routev4_list.remove(self.new_route4)
-            self.dut.routev6_list.remove(self.new_route6)
-            sai_thrift_remove_route_entry(self.client, self.new_route4)
-            self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-            sai_thrift_remove_route_entry(self.client, self.new_route6)
-            self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-            #TODO: delete servers[21]?
+            pass
 
     def tearDown(self):
         super().tearDown()
@@ -186,18 +141,13 @@ class DropRouteTest(T0TestBase):
         4. Check the packet drop counter
         """
         print("DropRouteTest...")
-        self.port5_rif = sai_thrift_create_router_interface(self.client,
-                                                            virtual_router_id=self.dut.default_vrf,
-                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
-                                                            port_id=self.dut.port_list[5])
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
 
         self.t1_list[1][10].ip_prefix = '24'
         self.t1_list[1][10].ip_prefix_v6 = '112'
-        self.new_route4, self.new_route6 = self.route_configer.create_route_path_by_nexthop(
-            dest_device=self.t1_list[1][10],
-            nexthopv4=self.dut.lag1.nexthopv4,
-            nexthopv6=self.dut.lag1.nexthopv6)
+        self.new_routev4, self.new_routev6 = self.route_configer.create_route_by_nexthop(
+            dest_device=self.t1_list[1][0],
+            nexthopv4=self.dut.lag_list[0].nexthopv4_list[0],
+            nexthopv6=self.dut.lag_list[0].nexthopv6_list[0])
         sai_thrift_set_route_entry_attribute(self.client, self.new_route4, packet_action=SAI_PACKET_ACTION_DROP)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         print("create new route with SAI_PACKET_ACTION_DROP")
@@ -207,19 +157,13 @@ class DropRouteTest(T0TestBase):
                                 ip_id=105,
                                 ip_ttl=64)
         try:
-            send_packet(self, 5, pkt)
+            send_packet(self, self.dut.port_obj_list[5].dev_port_index, pkt)
             verify_no_other_packets(self)
             print("no other packets")
             #TODO check packet drop counter
         finally:
-            sai_thrift_remove_router_interface(self.client, self.port5_rif)
-            self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-            self.dut.routev4_list.remove(self.new_route4)
-            self.dut.routev6_list.remove(self.new_route6)
-            sai_thrift_remove_route_entry(self.client, self.new_route4)
-            self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-            sai_thrift_remove_route_entry(self.client, self.new_route6)
-            self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+            #TODO remote new created route entry
+            pass
 
     def tearDown(self):
         super().tearDown()

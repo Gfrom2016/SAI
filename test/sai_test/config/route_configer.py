@@ -86,6 +86,9 @@ def t0_route_config_helper(
                                               no_host=False)
         nhv4, nhv6 = route_configer.create_nexthop_by_rif(rif=rif,
                                                           nexthop_device=test_obj.t1_list[1][100])
+        test_obj.dut.lag_list[0].nexthopv4_list.append(nhv4)
+        test_obj.dut.lag_list[0].nexthopv6_list.append(nhv6)
+        
         route_configer.create_route_by_nexthop(
             dest_device=test_obj.servers[11][0],
             nexthopv4=nhv4,
