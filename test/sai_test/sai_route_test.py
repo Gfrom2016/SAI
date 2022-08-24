@@ -190,12 +190,8 @@ class RouteUpdateTest(T0TestBase):
         6. Verify packet received with SMAC: SWITCH_MAC SIP 192.168.0.1 DIP:192.168.11.1 on one of LAG1 member
         """
         print("RouteUpdateTest...")
-        self.port5_rif = sai_thrift_create_router_interface(self.client,
-                                                            virtual_router_id=self.dut.default_vrf,
-                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
-                                                            port_id=self.dut.port_list[5])
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         
+        self.recv_dev_port_idxs = self.get_dev_port_indexes(self.servers[11][1].l3_lag_obj.member_port_indexs)
         pkt = simple_tcp_packet(eth_dst=ROUTER_MAC,
                                 ip_dst=self.servers[11][1].ipv4,
                                 ip_id=105,
@@ -210,7 +206,7 @@ class RouteUpdateTest(T0TestBase):
             self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
             print("set route on 192.168.11.0/24 with action SAI_PACKET_ACTION_DROP")
 
-            send_packet(self, 5, pkt)
+            send_packet(self, self.dut.port_obj_list[5].dev_port_index, pkt)
             verify_no_other_packets(self)
             print("no packets received after set packet action to DROP")
 
@@ -218,12 +214,11 @@ class RouteUpdateTest(T0TestBase):
             self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
             print("Update route action to forward")
 
-            send_packet(self, 5, pkt)
-            verify_packet_any_port(self, exp_pkt, self.dut.lag1.member_port_indexs)
+            send_packet(self, self.dut.port_obj_list[5].dev_port_index, pkt)
+            verify_packet_any_port(self, exp_pkt, self.recv_dev_port_idxs)
             print("packet received on one of lag1 member after set packet action to FORWARD")
         finally:
-            sai_thrift_remove_router_interface(self.client, self.port5_rif)
-            self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+            pass
 
     def tearDown(self):
         super().tearDown()
@@ -243,19 +238,6 @@ class RouteLPMRouteNexthopTest(T0TestBase):
         self.dst_ip = '192.168.1.200'
         self.dmac1 = '00:11:22:33:44:55'
         self.dmac2 = '00:11:22:33:44:66'
-
-        self.port5_rif = sai_thrift_create_router_interface(self.client,
-                                                            virtual_router_id=self.dut.default_vrf,
-                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
-                                                            port_id=self.dut.port_list[5])
-        self.port2_rif = sai_thrift_create_router_interface(self.client,
-                                                            virtual_router_id=self.dut.default_vrf,
-                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
-                                                            port_id=self.dut.port_list[2])
-        self.port1_rif = sai_thrift_create_router_interface(self.client,
-                                                            virtual_router_id=self.dut.default_vrf,
-                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
-                                                            port_id=self.dut.port_list[1])
     
     def runTest(self):
         """
@@ -354,19 +336,6 @@ class RouteLPMRouteRifTest(T0TestBase):
         self.dst_ip = '192.168.1.200'
         self.dmac1 = '00:11:22:33:44:55'
         self.dmac2 = '00:11:22:33:44:66'
-
-        self.port5_rif = sai_thrift_create_router_interface(self.client,
-                                                            virtual_router_id=self.dut.default_vrf,
-                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
-                                                            port_id=self.dut.port_list[5])
-        self.port2_rif = sai_thrift_create_router_interface(self.client,
-                                                            virtual_router_id=self.dut.default_vrf,
-                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
-                                                            port_id=self.dut.port_list[2])
-        self.port1_rif = sai_thrift_create_router_interface(self.client,
-                                                            virtual_router_id=self.dut.default_vrf,
-                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
-                                                            port_id=self.dut.port_list[1])
     
     def runTest(self):
         """
@@ -435,12 +404,6 @@ class RouteLPMRouteRifTest(T0TestBase):
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         sai_thrift_remove_neighbor_entry(self.client, self.port1_nbr_entry)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_router_interface(self.client, self.port2_rif)
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_router_interface(self.client, self.port5_rif)
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
-        sai_thrift_remove_router_interface(self.client, self.port1_rif)
-        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         super().tearDown()
 
 
@@ -458,30 +421,24 @@ class SviMacFloodingTest(T0TestBase):
     def runTest(self):
         """
         1. Check config for mac for port1~8 already exist
-        2. Check already created route and neighbor as, route subnet 192.168.1.0/24 next hop to VLAN10 SVI, neighbor for Port2-4 with IP DIP:192.168.1.92-94 bind to VLAN10 SVI
-        3. Create neighbor for DIP:192.168.1.94 with new DMAC:Mac4 on port4 route interface
-        4. Send packet with DMAC: SWITCH_MAC, SMAC:00:01:01:99:01:92 and DIP: IP:192.168.1.94 on port10
-        5. No packet or flooding on VLAN10 member port
+        2. Check vlan interfaces(svi added)
+        3. Check already created route and neighbor as, route subnet 192.168.1.0/24 next hop to VLAN10 SVI, neighbor for Port2-4 with IP DIP:192.168.1.92-94 bind to VLAN10 SVI
+        4. Create neighbor for DIP:192.168.1.94 with new DMAC:Mac4 on VLAN10 route interface
+        5. Send packet with DMAC: SWITCH_MAC, SMAC:00:01:01:99:01:92 and DIP: IP:192.168.1.94 on port10
+        6. No packet or flooding on VLAN10 member port
         """
 
         # create neighbor for DIP:192.168.1.94 with new DMAC:Mac4 on port4 route interface
         dmac4 = '00:11:22:33:44:55'
-        self.port4_nbr_device = Device(device_type=DeviceType.server, id=94, group_id=1)
-        self.port4_nbr_device.mac = dmac4
-        self.port4_rif = sai_thrift_create_router_interface(self.client,
-                                                            virtual_router_id=self.dut.default_vrf,
-                                                            type=SAI_ROUTER_INTERFACE_TYPE_PORT,
-                                                            port_id=self.dut.port_list[4])
-        self.port4_nbr_v4, self.port4_nbr_v6 = self.route_configer.create_neighbor_by_rif(nexthop_device=self.port4_nbr_device, rif=self.port4_rif)
-        # new nbr_entry appended to list, need to remove when teardown
-        print("Create neighbor for DIP:192.168.1.94 with new DMAC:Mac4 on port4 route interface")
+        self.servers[1][94].mac = dmac4
+        self.port4_nbr_v4, self.port4_nbr_v6 = self.route_configer.create_neighbor_by_rif(nexthop_device=self.servers[1][94], rif=self.dut.vlans[10].rif_list[0])
+        print("Create neighbor for DIP:192.168.1.94 with new DMAC:Mac4 on vlan10 route interface")
         
         pkt = simple_tcp_packet(eth_dst=ROUTER_MAC,
                                 eth_src=self.servers[1][92].mac,
                                 ip_dst=self.servers[1][94].ipv4)
         try:
-            # didn't create router interface for port10 because we have router interface for vlan20
-            send_packet(self, 10, pkt)
+            send_packet(self, self.dut.port_obj_list[10].dev_port_index, pkt)
             verify_no_other_packets(self)
             print("No packet on vlan10 member")
         finally:
@@ -490,7 +447,39 @@ class SviMacFloodingTest(T0TestBase):
     def tearDown(self):
         self.dut.neighborv4_list.remove(self.port4_nbr_v4)
         self.dut.neighborv6_list.remove(self.port4_nbr_v6)
-        sai_thrift_remove_router_interface(self.client, self.port4_rif)
+        sai_thrift_remove_neighbor_entry(self.client, self.port4_nbr_v4)
+        self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
+        sai_thrift_remove_neighbor_entry(self.client, self.port4_nbr_v6)
         self.assertEqual(self.status(), SAI_STATUS_SUCCESS)
         super().tearDown()
 
+
+class SviMacLearingTest(T0TestBase):
+    """
+    Verify route to svi and mac learning
+    """
+
+    def setUp(self):
+        """
+        Test the basic setup process.
+        """
+        super().setUp()
+
+    def runTest(self):
+        """
+        1. Run step 1-5 in test_svi_route_flooding
+        2. No packet or flooding on VLAN10 member port(expect port2)
+        3. For mac learning, send packet with SMAC:ServerX_MAC DMAC: PORT3 MAC and DIP: Port10 Server_IP on port4 (learn ServerX_MAC on port4)
+        4. Received packet with the DMAC:Port10 Server_MAC, SMAC: SWITCH_MAC and DIP: Port10 Server_IP on port10
+        5. For check mac learning from L2, send packet with DMAC: ServerX_MAC, SMAC:Port2 Server_MAC on port2
+        6. Received packet with the DMAC: ServerX_MAC, SMAC:Port2 Server_MAC on port4
+        """
+        self.serverx_mac = ''
+        pkt1 = simple_tcp_packet(eth_dst=self.servers[1][3].mac,
+                                 eth_src=self.serverx_mac,
+                                 ip_dst=self.servers[1][10].ipv4,
+                                 ip_id=105,
+                                 ip_ttl=64)
+        exp_pkt1 = simple_tcp_packet()
+    def tearDown(self):
+        super().tearDown()
