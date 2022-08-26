@@ -20,6 +20,7 @@
 
 from sai_test_base import T0TestBase
 from sai_utils import *
+from time import sleep
 
 from data_module.device import Device, DeviceType
 
@@ -434,7 +435,7 @@ class SviMacFloodingTest(T0TestBase):
         
         send_packet(self, self.dut.port_obj_list[10].dev_port_index, pkt)
         verify_no_other_packets(self)
-        print("No packet on vlan10 member")        
+        print("No packet on vlan10 member")
 
     def runTest(self):
         try:
@@ -473,8 +474,8 @@ class SviMacLearningTest(T0TestBase):
         6. Received packet with the DMAC: ServerX_MAC, SMAC:Port2 Server_MAC on port4
         """
         #TODO run sviMacFloodingTest
-        self.serverx_mac = ''
-        pkt1 = simple_tcp_packet(eth_dst=self.servers[1][4].mac,
+        self.serverx_mac = '00:01:01:99:99:99'
+        pkt1 = simple_tcp_packet(eth_dst=ROUTER_MAC,
                                  eth_src=self.serverx_mac,
                                  ip_dst=self.servers[1][10].ipv4,
                                  ip_id=105,
@@ -511,16 +512,9 @@ class SviMacMoveTest(T0TestBase):
         """
         super().setUp()
     
-    def runTest(self):
-        """
-        1. Run step 1-6 in test_svi_mac_learning
-        2. Send packet with DMAC: SWITCH_MAC, SMAC:ServerX_MAC and DIP: Port10 Server_IP on port3 (mac ServerX_MAC move to port3)
-        3. Received packet with the DMAC:Port10 Server_MAC, SMAC: SWITCH_MAC and DIP: Port10 Server_IP on port10
-        4. For check mac learning from L2, send packet with DMAC: ServerX_MAC, SMAC:Port2 Server_MAC on port2
-        5. Received packet with the DMAC: ServerX_MAC, SMAC:Port2 Server_MAC on port3
-        """
+    def sviMacMoveTest(self):
         #TODO run SviMacLearningTest
-        self.serverx_mac = ''
+        self.serverx_mac = '00:01:01:99:99:99'
         pkt1 = simple_tcp_packet(eth_dst=ROUTER_MAC,
                                  eth_src=self.serverx_mac,
                                  ip_dst=self.servers[1][10].ipv4,
@@ -533,13 +527,24 @@ class SviMacMoveTest(T0TestBase):
                                      ip_ttl=63)
         pkt2 = simple_udp_packet(eth_dst=self.serverx_mac,
                                  eth_src=self.servers[1][2].mac)
-        
-        try:
-            send_packet(self, self.dut.port_obj_list[3].dev_port_index, pkt1)
-            verify_packet(self, exp_pkt1, self.dut.port_obj_list[10].dev_port_index)
 
-            send_packet(self, self.dut.port_obj_list[2].dev_port_index, pkt2)
-            verify_packet(self, pkt2, self.dut.port_obj_list[3].dev_port_index)
+        send_packet(self, self.dut.port_obj_list[3].dev_port_index, pkt1)
+        verify_packet(self, exp_pkt1, self.dut.port_obj_list[10].dev_port_index)
+
+        time.sleep(3)
+        send_packet(self, self.dut.port_obj_list[2].dev_port_index, pkt2)
+        verify_packet(self, pkt2, self.dut.port_obj_list[3].dev_port_index)
+    
+    def runTest(self):
+        """
+        1. Run step 1-6 in test_svi_mac_learning
+        2. Send packet with DMAC: SWITCH_MAC, SMAC:ServerX_MAC and DIP: Port10 Server_IP on port3 (mac ServerX_MAC move to port3)
+        3. Received packet with the DMAC:Port10 Server_MAC, SMAC: SWITCH_MAC and DIP: Port10 Server_IP on port10
+        4. For check mac learning from L2, send packet with DMAC: ServerX_MAC, SMAC:Port2 Server_MAC on port2
+        5. Received packet with the DMAC: ServerX_MAC, SMAC:Port2 Server_MAC on port3
+        """
+        try:
+            self.sviMacMoveTest()
         finally:
             pass
 
@@ -590,11 +595,10 @@ class SviMacAgeTest(T0TestBase):
         4. Send packet with DMAC: SWITCH_MAC, SMAC:00:01:01:99:01:92 and DIP: IP:192.168.1.94 on port2
         5. No packet or flooding on vlan10 member
         """
-        switch_attr = sai_thrift_get_switch_attribute(
-            self.client,
-            fdb_age_time=True)
+        switch_attr = sai_thrift_get_switch_attribute(self.client,
+                                                      fdb_age_time=True)
         self.default_wait_time = switch_attr["fdb_aging_time"]
-        print("Default aging time is {} sec".format(self.default_wait_time))
+        print("Default fdb aging time is {} sec".format(self.default_wait_time))
         # age time used in tests (in sec)
         self.age_time = 10
         status = sai_thrift_set_switch_attribute(self.client,
@@ -603,7 +607,232 @@ class SviMacAgeTest(T0TestBase):
         switch_attr = sai_thrift_get_switch_attribute(self.client,
                                                   fdb_aging_time=True)
         self.assertEqual(switch_attr["fdb_aging_time"], self.age_time)
-        print("Set aging time to {} sec".format(self.age_time))
+        print("Set fdb aging time to {} sec".format(self.age_time))
+
+        pkt = simple_tcp_packet(eth_dst=ROUTER_MAC,
+                                eth_src=self.servers[1][92].mac,
+                                ip_dst=self.servers[1][94].ipv4,
+                                ip_id=105,
+                                ip_ttl=64)
+        try:
+            send_packet(self, self.dut.port_obj_list[2].dev_port_index, pkt)
+            verify_no_other_packets(self)
+            #TODO or flooding on vlan10 member
+            print("No packet on vlan10 member")
+        finally:
+            pass
     
+    def tearDown(self):
+        status = sai_thrift_set_switch_attribute(self.client,
+                                                 fdb_aging_time=self.default_wait_time)
+        self.assertEqual(status, SAI_STATUS_SUCCESS)
+        super().tearDown()
+
+
+class SviMacAgeAfterMoveTest(T0TestBase):
+    """
+    Verify route to svi and mac age after mac move
+    """
+    def setUp(self):
+        """
+        Test the basic setup process.
+        """
+        super().setUp()
+    
+    def runTest(self):
+        """
+        1. Set FDB aging time=10
+        2. Run step 1-6 in test_svi_mac_move
+        3. Wait for FDB aging time
+        4. Send packet with DMAC: SWITCH_MAC, SMAC:00:01:01:99:01:92 and DIP: IP:192.168.1.94 on port2
+        5. No packet or flooding on VLAN10 member port(expect port2)
+        6. Repeat test_svi_mac_move to check the mac learn and mac move is funcational after age
+        """
+        switch_attr = sai_thrift_get_switch_attribute(self.client,
+                                                      fdb_age_time=True)
+        self.default_wait_time = switch_attr["fdb_aging_time"]
+        print("Default fdb aging time is {} sec".format(self.default_wait_time))
+        # age time used in tests (in sec)
+        self.age_time = 10
+        status = sai_thrift_set_switch_attribute(self.client,
+                                                 fdb_aging_time=self.age_time)
+        self.assertEqual(status, SAI_STATUS_SUCCESS)
+        switch_attr = sai_thrift_get_switch_attribute(self.client,
+                                                  fdb_aging_time=True)
+        self.assertEqual(switch_attr["fdb_aging_time"], self.age_time)
+        print("Set fdb aging time to {} sec".format(self.age_time))
+
+    def tearDown(self):
+        super().tearDown()
+
+
+class SviMacLearnAfterAgeTest(T0TestBase):
+    """
+    Verify route mac learn after age
+    """
+    def setUp(self):
+        """
+        Test the basic setup process.
+        """
+        super().setUp()
+    
+    def runTest(self):
+        """
+        1. Set FDB aging time=10
+        2. Run step 1-6 in test_svi_mac_learning
+        3. wait for half of the FDB aging time
+        4. Run step 2-3 in test_svi_mac_move
+        5. wait for the FDB aging time
+        6. Send packet with DMAC: SWITCH_MAC, SMAC:00:01:01:99:01:92 and DIP: IP:192.168.1.94 on port2
+        7. No packet or flooding on vlan10 member
+        """
+        # Set FDB aging time=10
+        switch_attr = sai_thrift_get_switch_attribute(self.client,
+                                                      fdb_age_time=True)
+        self.default_wait_time = switch_attr["fdb_aging_time"]
+        print("Default fdb aging time is {} sec".format(self.default_wait_time))
+        # age time used in tests (in sec)
+        self.age_time = 10
+        status = sai_thrift_set_switch_attribute(self.client,
+                                                 fdb_aging_time=self.age_time)
+        self.assertEqual(status, SAI_STATUS_SUCCESS)
+        switch_attr = sai_thrift_get_switch_attribute(self.client,
+                                                  fdb_aging_time=True)
+        self.assertEqual(switch_attr["fdb_aging_time"], self.age_time)
+        print("Set fdb aging time to {} sec".format(self.age_time))
+
+        # svimaclearning
+        self.serverx_mac = '00:01:01:99:99:99'
+        pkt1 = simple_tcp_packet(eth_dst=ROUTER_MAC,
+                                 eth_src=self.serverx_mac,
+                                 ip_dst=self.servers[1][10].ipv4,
+                                 ip_id=105,
+                                 ip_ttl=64)
+        exp_pkt1 = simple_tcp_packet(eth_dst=self.servers[1][10].mac,
+                                     eth_src=ROUTER_MAC,
+                                     ip_dst=self.servers[1][10].ipv4,
+                                     ip_id=105,
+                                     ip_ttl=64)
+
+        pkt2 = simple_udp_packet(eth_dst=self.serverx_mac,
+                                 eth_src=self.servers[1][2].mac)
+
+        try:
+            send_packet(self, self.dut.port_obj_list[4].dev_port_index, pkt1)
+            verify_packet(self, exp_pkt1, self.dut.port_obj_list[10].dev_port_index)
+
+            # check mac learnt
+            send_packet(self, self.dut.port_obj_list[2], pkt2)
+            verify_packet(self, pkt2, self.dut.port_obj_list[4].dev_port_index)
+
+            # wait for half of the FDB aging time
+            time.sleep(self.age_time / 2)
+
+            # Run step 2-3 in test_svi_mac_move
+            pkt3 = simple_tcp_packet(eth_dst=ROUTER_MAC,
+                                    eth_src=self.serverx_mac,
+                                    ip_dst=self.servers[1][10].ipv4,
+                                    ip_id=105,
+                                    ip_ttl=64)
+            exp_pkt3 = simple_tcp_packet(eth_dst=self.servers[1][10].mac,
+                                        eth_src=ROUTER_MAC,
+                                        ip_dst=self.servers[1][10].ipv4,
+                                        ip_id=105,
+                                        ip_ttl=63)
+
+
+            send_packet(self, self.dut.port_obj_list[3].dev_port_index, pkt3)
+            verify_packet(self, exp_pkt3, self.dut.port_obj_list[10].dev_port_index)
+
+            # wait for the FDB aging time
+            time.sleep(self.age_time)
+
+            # Send packet with DMAC: SWITCH_MAC, SMAC:00:01:01:99:01:92 and DIP: IP:192.168.1.94 on port2
+            pkt4 = simple_tcp_packet(eth_dst=ROUTER_MAC,
+                                     eth_src=self.servers[1][92].mac,
+                                     ip_dst=self.servers[1][94].ipv4,
+                                     ip_id=105,
+                                     ip_ttl=64)
+            send_packet(self, self.dut.port_obj_list[2].dev_port_index, pkt4)
+            # No packet or flooding on vlan10 member
+            verify_no_other_packets(self)
+            print("No packet or flooding on vlan10 member")
+        finally:
+            pass
+
+    def tearDown(self):
+        super().tearDown()
+
+
+class SviRouteL3Test(T0TestBase):
+    """
+    Verify route to svi route(through next hop and neighbor)
+    """
+    def setUp(self):
+        """
+        Test the basic setup process.
+        """
+        super().setUp()
+    
+    def runTest(self):
+        """
+        1. Make Sure route interface, neighbor, and route already exist in the config for VLAN20 SVI and its members
+        2. send packets with DMAC: SWITCH_MAC and different IPs in the range DIP: IP:192.168.2.9-11 on port5
+        3. Verify the packet received on port9 to Port11 when sending a packet with different DIPs
+        """
+        for index in range(9, 12):
+            pkt = simple_tcp_packet(eth_dst=ROUTER_MAC,
+                                    eth_src=self.servers[1][5].mac,
+                                    ip_dst=self.servers[2][index].ipv4,
+                                    ip_id=105,
+                                    ip_ttl=64)
+            exp_pkt = simple_tcp_packet(eth_dst=self.servers[2][index].mac,
+                                        eth_src=ROUTER_MAC,
+                                        ip_dst=self.servers[2][index].ipv4,
+                                        ip_id=105,
+                                        ip_ttl=63)
+            try:
+                send_packet(self, self.dut.port_obj_list[5].dev_port_index, pkt)
+                verify_packet(self, exp_pkt, self.dut.port_obj_list[index].dev_port_index)
+            finally:
+                pass
+
+    def tearDown(self):
+        super().tearDown()
+
+
+class SviDierctbroadcastTest(T0TestBase):
+    """
+    Verify svi direct broadcast
+    """
+    def setUp(self):
+        """
+        Test the basic setup process.
+        """
+        super().setUp()
+    
+    def runTest(self):
+        """
+        1. Make sure route interface, neighbor, and route already exist in the config for VLAN20 SVI.
+        2. Make sure Broadcast neighbor already exists in config within VLAN20 subnet (broadcast IP and DMAC is broadcast address)
+        3. send packet with DMAC: SWITCH_MAC DIP: IP:192.168.2.255 on port5
+        4. Verify packet received on port9-16
+        """
+        recv_dev_ports = self.get_dev_port_indexes(self.dut.vlans[20].port_idx_list)
+        pkt = simple_tcp_packet(eth_dst=ROUTER_MAC,
+                                ip_dst=self.dut.vlans[20].broadcast_neighbor_device.ipv4,
+                                ip_id=105,
+                                ip_ttl=64)
+        exp_pkt = simple_tcp_packet(eth_dst=BROADCAST_MAC,
+                                    eth_src=ROUTER_MAC,
+                                    ip_dst=self.dut.vlans[20].broadcast_neighbor_device.ipv4,
+                                    ip_id=105,
+                                    ip_ttl=63)
+        try:
+            send_packet(self, self.dut.port_obj_list[5].dev_port_index, pkt)
+            verify_each_packet_on_multiple_port_lists(self, [exp_pkt], recv_dev_ports)
+        finally:
+            pass
+
     def tearDown(self):
         super().tearDown()
