@@ -23,7 +23,7 @@ from sai_base_test import *
 
 
 @group("draft")
-class LAGCreateLagMember(SaiHelper):
+class LAGCreateLagMember(PlatformSaiHelper):
     '''
     Test LAG member creation
     '''
@@ -125,7 +125,7 @@ def print_ports_stats(client, ports):
 
 
 @group("draft")
-class LAGDisableIngressLagMember(SaiHelper):
+class LAGDisableIngressLagMember(PlatformSaiHelper):
     '''
     Test Disable Ingress LAG member feature
     '''
@@ -220,7 +220,7 @@ class LAGDisableIngressLagMember(SaiHelper):
 
 
 @group("draft")
-class LAGDisableEgressLagMember(SaiHelper):
+class LAGDisableEgressLagMember(PlatformSaiHelper):
     '''
     Test DisableEgress LAG member feature
     '''
