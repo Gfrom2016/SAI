@@ -73,7 +73,7 @@ class SwitchConfiger(object):
                 self.test_obj.client, init_switch=True, warm_recover=True)
         else:
             switch_id = sai_thrift_create_switch(
-                self.test_obj.client, init_switch=True, src_mac_address=route_mac)
+                self.test_obj.client, init_switch=True)
         self.test_obj.assertEqual(self.test_obj.status(), SAI_STATUS_SUCCESS)
 
         print("Waiting for switch to get ready, {} seconds ...".format(
@@ -90,14 +90,7 @@ class SwitchConfiger(object):
             active_ports_no: number_of_active_ports
 
         """
-
-        print("Ignore all the expect error code and exception captures.")
-        capture_status = adapter.CATCH_EXCEPTIONS
-        expected_code = adapter.EXPECTED_ERROR_CODE
-
-        adapter.CATCH_EXCEPTIONS = True
-        adapter.EXPECTED_ERROR_CODE = []
-
+        
         attr = sai_thrift_get_switch_attribute(
             self.client, number_of_system_ports=True)
         number_of_system_ports = 0
@@ -110,4 +103,3 @@ class SwitchConfiger(object):
             self.client, number_of_active_ports=True)
         self.test_obj.dut.active_ports_no = attr['number_of_active_ports']
         print("Get number_of_active_ports {}".format(self.test_obj.dut.active_ports_no))
-        print("Restore all the expect error code and exception captures.")

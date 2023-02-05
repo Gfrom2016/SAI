@@ -581,7 +581,9 @@ class PortConfiger(object):
             self.test_obj.assertEqual(queue, q_attr['index'])
 
     def log_port_state(self, port:Port, index):
-        print("port index:{} hardIdx: {} ptf_dev_idx: {} name:{} config lane:{} mtu:{} fec:{} speed:{}".format(
+        print("port index:{} hardIdx: {} "
+        .join("ptf_dev_idx: {} name:{}")
+        .join("config lane:{} mtu:{} fec:{} speed:{}").format(
             index,
             port.port_index,
             port.dev_port_index,
