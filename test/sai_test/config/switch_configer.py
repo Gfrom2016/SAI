@@ -32,10 +32,8 @@ def t0_switch_config_helper(test_obj: 'T0TestBase'):
     """
     Make t0 switch configurations base on the configuration in the test plan.
     Set the configuration in test directly.
-
     Set the following test_obj attributes:
         int: switch_id
-
     """
     configer = SwitchConfiger(test_obj)
     test_obj.dut.switch_id = configer.start_switch()
@@ -49,7 +47,6 @@ class SwitchConfiger(object):
     def __init__(self, test_obj: 'T0TestBase') -> None:
         """
         Init the Switch configer.
-
         Args:
             test_obj: the test object
         """
@@ -60,11 +57,9 @@ class SwitchConfiger(object):
     def start_switch(self, switch_init_wait=3, route_mac=ROUTER_MAC):
         """
         Start switch and wait seconds for a warm up.
-
         Args:
             switch_init_wait: switch init wait time (sec)
             route_mac: route mac (switch mac)
-
         Returns:
             Vlan: vlan object
         """
@@ -73,7 +68,7 @@ class SwitchConfiger(object):
                 self.test_obj.client, init_switch=True, warm_recover=True)
         else:
             switch_id = sai_thrift_create_switch(
-                self.test_obj.client, init_switch=True)
+                self.test_obj.client, init_switch=True, src_mac_address=route_mac)
         self.test_obj.assertEqual(self.test_obj.status(), SAI_STATUS_SUCCESS)
 
         print("Waiting for switch to get ready, {} seconds ...".format(
@@ -88,9 +83,15 @@ class SwitchConfiger(object):
         includes:
             system_port_no: number_of_system_ports
             active_ports_no: number_of_active_ports
-
         """
-        
+
+        print("Ignore all the expect error code and exception captures.")
+        capture_status = adapter.CATCH_EXCEPTIONS
+        expected_code = adapter.EXPECTED_ERROR_CODE
+
+        adapter.CATCH_EXCEPTIONS = True
+        adapter.EXPECTED_ERROR_CODE = []
+
         attr = sai_thrift_get_switch_attribute(
             self.client, number_of_system_ports=True)
         number_of_system_ports = 0
@@ -103,3 +104,4 @@ class SwitchConfiger(object):
             self.client, number_of_active_ports=True)
         self.test_obj.dut.active_ports_no = attr['number_of_active_ports']
         print("Get number_of_active_ports {}".format(self.test_obj.dut.active_ports_no))
+        print("Restore all the expect error code and exception captures.")
